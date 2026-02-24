@@ -1,0 +1,86 @@
+===PROMPT: full_solution_with_hint===
+You are learning mathematics. For each task, you are given:
+- A math problem.
+- A partial proof or solution that has already been started but is incomplete.
+
+Your job is to **continue the partial proof from where it left off** and complete it to reach the final answer. Do not restart the solution from the beginning. Pick up exactly where the partial proof ends, maintain its notation and approach, and carry the reasoning forward to completion. Conclude with the final answer, typeset in \boxed{} at the end.
+
+Please follow this format:
+1. **Read and understand the partial proof** provided.
+2. **Continue the reasoning from the last step** of the partial proof. Fill in the remaining logical steps, calculations, or arguments needed to reach the conclusion.
+3. **Write the final answer** clearly at the end, typeset using \boxed{}.
+
+**Output format:**
+A direct continuation of the partial proof, written in full sentences with clear mathematical reasoning. Do not repeat or rewrite the steps already provided. Simply continue from where the partial proof stops, and end with the boxed final answer.
+
+---
+
+### Example
+
+**Input:**
+Problem: Let \( f(x) = x^2 - 4x + 3 \). Find all real solutions to \( f(x) = 0 \).
+Partial proof: "We write \( f(x) = x^2 - 4x + 3 \). Factoring the quadratic, we find \( x^2 - 4x + 3 = (x - 1)(x - 3) \)..."
+
+**Output:**
+Setting each factor equal to zero, we get \( x - 1 = 0 \) giving \( x = 1 \), and \( x - 3 = 0 \) giving \( x = 3 \). Both values satisfy the original equation, so the solutions are:
+\boxed{1 \text{ and } 3}
+
+---
+
+*(Note: For longer or more complex problems, the continuation should be correspondingly detailed, maintaining the style and notation of the partial proof.)*
+
+---
+
+**Important:**
+- Do **not** restart the proof from the beginning.
+- Continue directly from where the partial proof ends.
+- Maintain the same notation, variable names, and approach used in the partial proof.
+- Complete all remaining logical steps needed to reach the final answer.
+- Final answer must be in \boxed{}.
+
+---
+
+**REMINDER:**
+Your objective: Given a math problem and a partial proof, continue the proof from where it left off to reach the complete solution (continuation first, boxed answer last).
+
+
+
+===PROMPT: full_solution_simple===
+You are learning mathematics. Your job is to solve the given math problem and produce a complete solution. Conclude with the final answer, typeset in \boxed{} at the end.
+
+Please follow this format:
+1. **Read and understand the problem** provided.
+2. **Work through the reasoning step by step.** Fill in all logical steps, calculations, or arguments needed to reach the conclusion.
+3. **Write the final answer** clearly at the end, typeset using \boxed{}.
+
+**Output format:**
+A complete solution, written in full sentences with clear mathematical reasoning. End with the boxed final answer.
+
+---
+
+### Example
+
+**Input:**
+Problem: Let \( f(x) = x^2 - 4x + 3 \). Find all real solutions to \( f(x) = 0 \).
+
+**Output:**
+We write \( f(x) = x^2 - 4x + 3 \). Factoring the quadratic, we find \( x^2 - 4x + 3 = (x - 1)(x - 3) \). Setting each factor equal to zero, we get \( x - 1 = 0 \) giving \( x = 1 \), and \( x - 3 = 0 \) giving \( x = 3 \). Both values satisfy the original equation, so the solutions are:
+\boxed{1 \text{ and } 3}
+
+---
+
+*(Note: For longer or more complex problems, the solution should be correspondingly detailed.)*
+
+---
+
+**Important:**
+- Provide a complete solution from start to finish.
+- Complete all logical steps needed to reach the final answer.
+- Final answer must be in \boxed{}.
+
+---
+
+**REMINDER:**
+Your objective: Given a math problem, solve it completely with clear reasoning (solution first, boxed answer last).
+
+

@@ -1,0 +1,49 @@
+# This example demonstrates distributed reinforcement learning training using veRL framework
+# Training a DeepSeek-LLM-7B-Chat model on GSM8K and MATH datasets using GRPO algorithm
+
+entrypoint: "python main.py"
+submission_id: "verl_grpo_training"
+shutdown_after_job_finishes: True
+ray_cluster_spec:
+  cluster_name: "veRL GRPO Training - DeepSeek 7B"
+  ray_version: 2.51.0
+  heartbeat_timeout_s: 300
+  idle_timeout_minutes: 60
+  upscaling_speed: 1000
+  runtime_env_activation_command: ":"
+  setup_command: bash setup.sh
+  head_node_type: head
+  resources:
+    docker_image: docker.apple.com/bolt/cuda:12.8.1-python3.10.11-ubuntu22.04
+    cluster: aws_4
+    ports:
+      - HTTP_API
+  environment_variables:
+    FI_EFA_FORK_SAFE: '1'
+    FI_EFA_USE_DEVICE_RDMA: '1'
+    FI_PROVIDER: efa
+    LD_LIBRARY_PATH: /opt/amazon/efa/lib:/opt/amazon/openmpi/lib:/opt/amazon/ofi-nccl/lib/x86_64-linux-gnu
+    NCCL_BUFFSIZE: '8388608'
+    NCCL_DEBUG: INFO
+    NCCL_TUNER_PLUGIN: libnccl-ofi-tuner.so
+    NCCL_IGNORE_DISABLED_P2P: '1'
+    PATH: /opt/amazon/openmpi/bin:$PATH
+    UCX_LOG_LEVEL: debug
+  roles:
+    worker:
+      resources:
+        task_type: 8gpu
+        max_node: 2
+        min_node: 2
+        rdma: true
+      cluster_options:
+        aws:
+          instance_type: p5.48xlarge
+    head:
+      resources:
+        task_type: 8cpu
+        max_node: 0
+        min_node: 0
+      ray_start_params:
+        num-cpus: "0"
+  project_id: apple_spot
