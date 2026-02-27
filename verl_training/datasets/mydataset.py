@@ -28,7 +28,7 @@ from verl.utils.hdfs_io import copy, makedirs
 SYSTEM_PROMPT_WITH_HINT = "full_solution_with_hint"
 SYSTEM_PROMPT_SIMPLE = "full_solution_simple"
 VALIDATION_SIZE = 128
-DATASET_NAME = "hint_helped_dataset"
+DATASET_NAME = "pope_dataset_filtered"
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "sbys_datasets", "pope_dataset_filtered")
 #PROCESSED_DATASET_SAVE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "outputs", "parquet_datasets", DATASET_NAME)
 PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")

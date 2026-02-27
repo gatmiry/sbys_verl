@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 ################################################################################
 # Khashayar's ADD-ONs
 ################################################################################
-DATASET_NAME = "hint_helped_dataset"
+DATASET_NAME = "pope_dataset_filtered"
 PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
-TOTAL_EPOCHS = 400
+TOTAL_EPOCHS = 600
     
 import argparse
 import random
@@ -214,7 +214,7 @@ def run_training():
         f"data.val_files={test_files}",
         "data.train_batch_size=1024",
         "data.max_prompt_length=4096",
-        "data.max_response_length=16384",
+        "data.max_response_length=24576",
         "data.filter_overlong_prompts=True",
         "data.truncation=error",
         # Model and actor configuration
@@ -222,7 +222,7 @@ def run_training():
         "actor_rollout_ref.actor.optim.lr=1e-6",
         "actor_rollout_ref.model.use_remove_padding=True",
         "actor_rollout_ref.actor.ppo_mini_batch_size=256",
-        "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=8",
+        "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2",
         # KL divergence loss configuration
         "actor_rollout_ref.actor.use_kl_loss=True",
         "actor_rollout_ref.actor.kl_loss_coef=0.001",
@@ -233,15 +233,15 @@ def run_training():
         "actor_rollout_ref.actor.fsdp_config.param_offload=False",
         "actor_rollout_ref.actor.fsdp_config.optimizer_offload=False",
         # Rollout configuration (vLLM)
-        "actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=8",
+        "actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4",
         "actor_rollout_ref.rollout.tensor_model_parallel_size=1",
         "actor_rollout_ref.rollout.name=vllm",
         "actor_rollout_ref.rollout.gpu_memory_utilization=0.7",
         "actor_rollout_ref.rollout.max_num_batched_tokens=32768",
         "actor_rollout_ref.rollout.n=5",
         # Reference model configuration
-        "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=8",
-        "actor_rollout_ref.ref.fsdp_config.param_offload=True",
+        "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4",
+        "actor_rollout_ref.ref.fsdp_config.param_offload=False",
         # Reward model disabled (using rule-based compute_score instead)
         "reward_model.enable=False",
         # Custom reward function for rule-based validation
@@ -251,14 +251,15 @@ def run_training():
         "algorithm.use_kl_in_reward=False",
         # Trainer configuration
         "trainer.critic_warmup=0",
-        'trainer.logger=["console"]',
-        "trainer.project_name=verl_grpo_example_gsm8k_math",
-        "trainer.experiment_name=qwen3_4b_instruct_grpo_math",
+        'trainer.logger=["console", "wandb"]',
+        "trainer.project_name=verl_grpo_pope_dataset_guided_hinting",
+        "trainer.experiment_name=qwen3_4b_instruct_grpo_pope_dataset_guided_hinting",
         f"trainer.default_local_dir={checkpoint_dir}",
         f"trainer.n_gpus_per_node={gpus_per_node}",
         f"trainer.nnodes={num_nodes}",
         "trainer.save_freq=20",
         "trainer.test_freq=5",
+        "trainer.log_val_generations=10",
         f"trainer.total_epochs={total_epochs}",
     ]
 

@@ -19,16 +19,28 @@ import argparse
 import json
 import os
 
+import sys
+from typing import List, Dict
+
 import datasets
 from verl.utils.hdfs_io import copy, makedirs
-from verl.utils.reward_score.math_reward import last_boxed_only_string, remove_boxed
 
-
-DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "outputs", "hint_helped_dataset", "hint_helped_dataset")
+DATASET_NAME = "math_dataset"
+PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
 VALIDATION_SIZE = 128
 
-def extract_solution(solution_str):
-    return remove_boxed(last_boxed_only_string(solution_str))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
+from utils import load_system_prompt
+
+SYSTEM_PROMPT_SIMPLE = "full_solution_simple"
+
+def format_prompt(problem: str) -> List[Dict[str, str]]:
+    """Format a problem into chat messages (system + user)."""
+    system_prompt = load_system_prompt(SYSTEM_PROMPT_SIMPLE)
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Problem: {problem}"},
+    ]
 
 
 if __name__ == "__main__":
@@ -42,46 +54,44 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--local_save_dir",
-        default="~/data/math",
+        default=PROCESSED_DATASET_SAVE_PATH,
         help="The save directory for the preprocessed dataset.",
     )
 
     args = parser.parse_args()
     local_dataset_path = args.local_dataset_path
 
-    # 'lighteval/MATH' is no longer available on huggingface.
-    # Use mirror repo: DigitalLearningGmbH/MATH-lighteval
     data_source = "DigitalLearningGmbH/MATH-lighteval"
-    print(f"Loading the {data_source} dataset from huggingface...", flush=True)
+    print(f"Loading the {data_source} dataset...", flush=True)
     if local_dataset_path is not None:
-        dataset = datasets.load_dataset(
-            local_dataset_path,
-        )
+        dataset = datasets.load_from_disk(local_dataset_path)
     else:
-        #dataset = datasets.load_dataset(
-        #    data_source,
-        #)
-        dataset = datasets.load_dataset(DATASET_PATH)
+        dataset = datasets.load_dataset(data_source, split="train")
 
     import random
     indices = list(range(len(dataset)))
-    test_indices = random.Random(42).shuffle(indices)[:VALIDATION_SIZE]
-    training_indices = [idx for idx in indices if idx not in test_indices]
+    random.Random(42).shuffle(indices)
+    validation_indices = indices[:VALIDATION_SIZE]
+    training_indices = indices[VALIDATION_SIZE:]
     train_dataset = dataset.select(training_indices)
-    test_dataset = dataset.select(test_indices)
+    test_dataset = dataset.select(validation_indices)
 
     # add a row to each data item that represents a unique id
     def make_map_fn(split):
         def process_fn(example, idx):
             question = example.pop("problem")
             answer = example.pop("solution")
-            solution = extract_solution(answer)
+            prompt = format_prompt(question)
             data = {
                 "data_source": data_source,
-                "prompt": [{"role": "user", "content": question}],
+                "prompt": prompt,
                 "ability": "math",
-                "reward_model": {"style": "rule", "ground_truth": solution},
-                "extra_info": {"split": split, "index": idx},
+                "reward_model": {"style": "rule", "ground_truth": answer},
+                "extra_info": {
+                    "split": split,
+                    "index": idx,
+                    "problem": question,
+                },
             }
             return data
 
