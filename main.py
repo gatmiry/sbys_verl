@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 ################################################################################
 # Khashayar's ADD-ONs
 ################################################################################
-DATASET_NAME = "pope_dataset_filtered"
+DATASET_NAME = "similar_dataset"
 PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
 TOTAL_EPOCHS = 600
     
@@ -161,14 +161,44 @@ def download_datasets():
         return result.stdout
 
     # Execute downloads in parallel
-    try:
-        hint_task = download_omni_math.remote()
+    #try:
+    #    hint_task = download_omni_math.remote()
         # Wait for both to complete
-        hint_output = ray.get([hint_task])
-        logger.info("All datasets downloaded and preprocessed successfully")
-        logger.debug(f"Hint helped dataset output: {hint_output}")
+    #    hint_output = ray.get([hint_task])
+    #    logger.info("All datasets downloaded and preprocessed successfully")
+    #    logger.debug(f"Hint helped dataset output: {hint_output}")
+    #except Exception as e:
+    #    logger.error(f"Dataset download failed: {e}")
+    #    raise
+
+    @ray.remote
+    def load_similar_dataset():
+        print(f"Downloading OMNI-MATH dataset...")
+        logger.info("Downloading OMNI-MATH dataset...")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        result = subprocess.run(
+            [sys.executable, "-m", "verl_training.datasets.similardataset"],
+            capture_output=True,
+            text=True,
+            cwd=script_dir,
+        )
+        if result.returncode != 0:
+            logger.error(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+            print(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+            raise RuntimeError(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+        logger.info("Similar dataset loaded successfully")
+        print(f"Similar dataset loaded successfully")
+        return result.stdout
+
+    # Execute downloads in parallel
+    try:
+        similar_task = load_similar_dataset.remote()
+        # Wait for both to complete
+        similar_output = ray.get([similar_task])
+        logger.info("All datasets loaded successfully")
+        logger.debug(f"Similar dataset output: {similar_output}")
     except Exception as e:
-        logger.error(f"Dataset download failed: {e}")
+        logger.error(f"Dataset load failed: {e}")
         raise
 
 
@@ -212,7 +242,7 @@ def run_training():
         # Data configuration
         f"data.train_files={train_files}",
         f"data.val_files={test_files}",
-        "data.train_batch_size=1024",
+        "data.train_batch_size=128",
         "data.max_prompt_length=4096",
         "data.max_response_length=24576",
         "data.filter_overlong_prompts=True",
@@ -221,7 +251,7 @@ def run_training():
         "actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507",
         "actor_rollout_ref.actor.optim.lr=1e-6",
         "actor_rollout_ref.model.use_remove_padding=True",
-        "actor_rollout_ref.actor.ppo_mini_batch_size=256",
+        "actor_rollout_ref.actor.ppo_mini_batch_size=64",
         "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2",
         # KL divergence loss configuration
         "actor_rollout_ref.actor.use_kl_loss=True",
@@ -230,7 +260,7 @@ def run_training():
         "actor_rollout_ref.actor.entropy_coeff=0",
         # Memory optimization
         "actor_rollout_ref.model.enable_gradient_checkpointing=True",
-        "actor_rollout_ref.actor.fsdp_config.param_offload=False",
+        "actor_rollout_ref.actor.fsdp_config.param_offload=True",
         "actor_rollout_ref.actor.fsdp_config.optimizer_offload=False",
         # Rollout configuration (vLLM)
         "actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4",
@@ -239,6 +269,9 @@ def run_training():
         "actor_rollout_ref.rollout.gpu_memory_utilization=0.7",
         "actor_rollout_ref.rollout.max_num_batched_tokens=32768",
         "actor_rollout_ref.rollout.n=5",
+        "actor_rollout_ref.rollout.val_kwargs.n=5",
+        "actor_rollout_ref.rollout.val_kwargs.do_sample=true",
+        "actor_rollout_ref.rollout.val_kwargs.temperature=1.0",
         # Reference model configuration
         "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4",
         "actor_rollout_ref.ref.fsdp_config.param_offload=False",
@@ -261,6 +294,8 @@ def run_training():
         "trainer.test_freq=5",
         "trainer.log_val_generations=10",
         f"trainer.total_epochs={total_epochs}",
+        f"trainer.rollout_data_dir={os.path.join(bolt.ARTIFACT_DIR, 'training_batches')}",
+        f"trainer.validation_data_dir={os.path.join(bolt.ARTIFACT_DIR, 'validation_batches')}",
     ]
 
     logger.info(f"Training command: {' '.join(training_args)}")

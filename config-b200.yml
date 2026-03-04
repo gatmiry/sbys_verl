@@ -1,7 +1,7 @@
 # This example demonstrates distributed reinforcement learning training using veRL framework
 # Training a DeepSeek-LLM-7B-Chat model on GSM8K and MATH datasets using GRPO algorithm
 
-entrypoint: "python main_multidata.py"
+entrypoint: "python main.py"
 submission_id: "verl_grpo_training"
 shutdown_after_job_finishes: True
 ray_cluster_spec:
@@ -41,8 +41,8 @@ ray_cluster_spec:
     worker:
       resources:
         task_type: 8gpu
-        max_node: 4
-        min_node: 4
+        max_node: 2
+        min_node: 2
         rdma: true
       cluster_options:
         aws:

@@ -13,7 +13,7 @@ def extract_boxed_answer(text: str) -> str | None:
     if not matches:
         return None
     
-    start_pos = matches[-1].end()
+    start_pos = matches[0].end()
     depth = 1
     i = start_pos
     
