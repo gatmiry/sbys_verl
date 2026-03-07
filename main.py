@@ -27,7 +27,8 @@ DATASET_NAME = "similar_dataset"
 PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
 TOTAL_EPOCHS = 600
 import datetime
-EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+SPECIAL_NAME = "batchsize_1024"
+EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}"
 
 import argparse
 import random
