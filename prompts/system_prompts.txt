@@ -37,6 +37,7 @@ Setting each factor equal to zero, we get \( x - 1 = 0 \) giving \( x = 1 \), an
 - Maintain the same notation, variable names, and approach used in the partial proof.
 - Complete all remaining logical steps needed to reach the final answer.
 - Final answer must be in \boxed{}.
+- Write \boxed{} exactly **once** at the very end of your response. Do NOT repeat the boxed answer anywhere else in your solution.
 
 ---
 
@@ -77,6 +78,7 @@ We write \( f(x) = x^2 - 4x + 3 \). Factoring the quadratic, we find \( x^2 - 4x
 - Provide a complete solution from start to finish.
 - Complete all logical steps needed to reach the final answer.
 - Final answer must be in \boxed{}.
+- Write \boxed{} exactly **once** at the very end of your response. Do NOT repeat the boxed answer anywhere else in your solution.
 
 ---
 

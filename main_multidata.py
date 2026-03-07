@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 ################################################################################
 # Khashayar's ADD-ONs
 ################################################################################
-DATASET_NAME = "similar_dataset"
-PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
+PROCESSED_DATASET_FOLDER = os.path.expanduser("~/data")
 TOTAL_EPOCHS = 600
     
 import argparse
@@ -161,44 +160,15 @@ def download_datasets():
         return result.stdout
 
     # Execute downloads in parallel
-    #try:
-    #    hint_task = download_omni_math.remote()
-        # Wait for both to complete
-    #    hint_output = ray.get([hint_task])
-    #    logger.info("All datasets downloaded and preprocessed successfully")
-    #    logger.debug(f"Hint helped dataset output: {hint_output}")
-    #except Exception as e:
-    #    logger.error(f"Dataset download failed: {e}")
-    #    raise
-
-    @ray.remote
-    def load_similar_dataset():
-        print(f"Downloading OMNI-MATH dataset...")
-        logger.info("Downloading OMNI-MATH dataset...")
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        result = subprocess.run(
-            [sys.executable, "-m", "verl_training.datasets.similardataset"],
-            capture_output=True,
-            text=True,
-            cwd=script_dir,
-        )
-        if result.returncode != 0:
-            logger.error(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-            print(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-            raise RuntimeError(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-        logger.info("Similar dataset loaded successfully")
-        print(f"Similar dataset loaded successfully")
-        return result.stdout
-
-    # Execute downloads in parallel
     try:
-        similar_task = load_similar_dataset.remote()
+        hint_task = download_omni_math.remote()
+        math_task = download_math.remote()
         # Wait for both to complete
-        similar_output = ray.get([similar_task])
-        logger.info("All datasets loaded successfully")
-        logger.debug(f"Similar dataset output: {similar_output}")
+        outputs = ray.get([hint_task, math_task])
+        logger.info("All datasets downloaded and preprocessed successfully")
+        logger.debug(f"Dataset outputs: {outputs}")
     except Exception as e:
-        logger.error(f"Dataset load failed: {e}")
+        logger.error(f"Dataset download failed: {e}")
         raise
 
 
@@ -219,18 +189,26 @@ def run_training():
     #math_train = home_dir / "data/math/train.parquet"
     #math_test = home_dir / "data/math/test.parquet"
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_save_dir", default=PROCESSED_DATASET_SAVE_PATH)
+    parser.add_argument("--data_folder", default=PROCESSED_DATASET_FOLDER)
     parser.add_argument("--total_epochs", default=TOTAL_EPOCHS)
+    parser.add_argument("--expname", type=str, default=None)
     args, _ = parser.parse_known_args()
-    local_save_dir = args.local_save_dir
+    data_folder = os.path.expanduser(args.data_folder)
     total_epochs = args.total_epochs
 
+    experiment_name = "qwen3_4b_instruct_grpo_pope_dataset_guided_hinting"
+    if args.expname:
+        experiment_name = f"{experiment_name}_{args.expname}"
 
+    dataset_names = ["hint_helped_dataset", "math_dataset"]
+    train_file_list = [os.path.join(data_folder, name, "train.parquet") for name in dataset_names]
+    test_file_list = [os.path.join(data_folder, name, "test.parquet") for name in dataset_names]
 
-    #train_files = f"['{gsm8k_train}', '{math_train}']"
-    #est_files = f"['{gsm8k_test}', '{math_test}']"
-    train_files = f"['{local_save_dir}/train.parquet']"
-    test_files = f"['{local_save_dir}/test.parquet']"
+    logger.info(f"Train files: {train_file_list}")
+    logger.info(f"Test files: {test_file_list}")
+
+    train_files = "[" + ", ".join(f"'{f}'" for f in train_file_list) + "]"
+    test_files = "[" + ", ".join(f"'{f}'" for f in test_file_list) + "]"
     # Training command with all hyperparameters
     # This mirrors the original run_deepseek7b_llm_math.sh script in veRL
     training_args = [
@@ -242,7 +220,7 @@ def run_training():
         # Data configuration
         f"data.train_files={train_files}",
         f"data.val_files={test_files}",
-        "data.train_batch_size=256",
+        "data.train_batch_size=1024",
         "data.max_prompt_length=4096",
         "data.max_response_length=24576",
         "data.filter_overlong_prompts=True",
@@ -251,7 +229,7 @@ def run_training():
         "actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507",
         "actor_rollout_ref.actor.optim.lr=1e-6",
         "actor_rollout_ref.model.use_remove_padding=True",
-        "actor_rollout_ref.actor.ppo_mini_batch_size=512", #512
+        "actor_rollout_ref.actor.ppo_mini_batch_size=256",
         "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2",
         # KL divergence loss configuration
         "actor_rollout_ref.actor.use_kl_loss=True",
@@ -266,15 +244,15 @@ def run_training():
         "actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4",
         "actor_rollout_ref.rollout.tensor_model_parallel_size=1",
         "actor_rollout_ref.rollout.name=vllm",
-        "actor_rollout_ref.rollout.gpu_memory_utilization=0.6",
-        "actor_rollout_ref.rollout.max_num_batched_tokens=32768", #131072
+        "actor_rollout_ref.rollout.gpu_memory_utilization=0.7",
+        "actor_rollout_ref.rollout.max_num_batched_tokens=32768",
         "actor_rollout_ref.rollout.n=5",
         "actor_rollout_ref.rollout.val_kwargs.n=5",
         "actor_rollout_ref.rollout.val_kwargs.do_sample=true",
         "actor_rollout_ref.rollout.val_kwargs.temperature=1.0",
         # Reference model configuration
         "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4",
-        "actor_rollout_ref.ref.fsdp_config.param_offload=False",
+        "actor_rollout_ref.ref.fsdp_config.param_offload=True",
         # Reward model disabled (using rule-based compute_score instead)
         "reward_model.enable=False",
         # Custom reward function for rule-based validation
@@ -286,7 +264,7 @@ def run_training():
         "trainer.critic_warmup=0",
         'trainer.logger=["console", "wandb"]',
         "trainer.project_name=verl_grpo_pope_dataset_guided_hinting",
-        "trainer.experiment_name=qwen3_4b_instruct_grpo_pope_dataset_guided_hinting",
+        f"trainer.experiment_name={experiment_name}",
         f"trainer.default_local_dir={checkpoint_dir}",
         f"trainer.n_gpus_per_node={gpus_per_node}",
         f"trainer.nnodes={num_nodes}",

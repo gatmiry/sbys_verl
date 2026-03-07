@@ -41,8 +41,8 @@ ray_cluster_spec:
     worker:
       resources:
         task_type: 8gpu
-        max_node: 2
-        min_node: 2
+        max_node: 8
+        min_node: 8
         rdma: true
       cluster_options:
         aws:

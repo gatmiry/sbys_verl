@@ -1,5 +1,9 @@
 """
-veRL Training Entry Point for bolt-ray
+veRL Training Entry Point for bolt-ray — HintDataset variant
+
+Uses HintDataset (hint_dataset.py) for dynamic hint-level adjustment
+via on_batch_end. The dataset preprocessor (similardataset.py) outputs
+sbys_solution as a top-level column and is_validation in extra_info.
 """
 
 import logging
@@ -61,26 +65,23 @@ num_nodes, gpus_per_node = load_cluster_config()
 
 def wait_for_resources_with_placement_group():
     """Wait for GPU resources using Ray placement groups."""
-    # TODO: Could explore native veRL PG support to directly re-use the PG created here.
     logger.info(
         f"Creating placement group for {num_nodes} nodes with {gpus_per_node} GPUs each..."
     )
 
-    # Create bundles - one bundle per node
     bundles = [{"GPU": gpus_per_node} for _ in range(num_nodes)]
 
     pg = ray.util.placement_group(
         bundles=bundles,
         strategy="SPREAD",
-        name="verl_training_pg",  # Named for easier debugging
+        name="verl_training_pg",
     )
 
     logger.info(f"Placement group created: {pg}")
     logger.info("Waiting for placement group to be ready...")
 
-    # Wait for placement group to be ready
     try:
-        ready = pg.wait(timeout_seconds=1800)  # 30 minutes
+        ready = pg.wait(timeout_seconds=1800)
         if not ready:
             raise RuntimeError(
                 f"Timeout waiting for placement group with {num_nodes} nodes "
@@ -91,7 +92,6 @@ def wait_for_resources_with_placement_group():
         logger.info("Freeing reserved resources for veRL to use...")
         ray.util.remove_placement_group(pg)
 
-        # Log the placement group details
         logger.info(f"Cluster resources: {ray.cluster_resources()}")
         logger.info(f"Available resources: {ray.available_resources()}")
 
@@ -104,120 +104,48 @@ def wait_for_resources_with_placement_group():
 
 
 def download_datasets():
-    """Download and preprocess GSM8K and MATH datasets in parallel."""
-    logger.info("Starting dataset download and preprocessing...")
-
-    # Create data directories
-    #home_dir = Path.home()
-    #(home_dir / "data/gsm8k").mkdir(parents=True, exist_ok=True)
-    #(home_dir / "data/math").mkdir(parents=True, exist_ok=True)
-
-    # Run both dataset downloads in parallel using Ray tasks
-    @ray.remote
-    def download_gsm8k():
-        logger.info("Downloading GSM8K dataset...")
-        result = subprocess.run(
-            [sys.executable, "-m", "verl_training.datasets.gsm8k"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            logger.error(f"GSM8K download failed: {result.stderr}")
-            raise RuntimeError("GSM8K dataset download failed")
-        logger.info("GSM8K dataset downloaded successfully")
-        return result.stdout
-
-    @ray.remote
-    def download_math():
-        logger.info("Downloading MATH dataset...")
-        result = subprocess.run(
-            [sys.executable, "-m", "verl_training.datasets.math_dataset"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            logger.error(f"MATH download failed: {result.stderr}")
-            raise RuntimeError("MATH dataset download failed")
-        logger.info("MATH dataset downloaded successfully")
-        return result.stdout
-
-    @ray.remote
-    def download_omni_math():
-        print(f"Downloading OMNI-MATH dataset...")
-        logger.info("Downloading OMNI-MATH dataset...")
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        result = subprocess.run(
-            [sys.executable, "-m", "verl_training.datasets.mydataset"],
-            capture_output=True,
-            text=True,
-            cwd=script_dir,
-        )
-        if result.returncode != 0:
-            logger.error(f"OMNI-MATH download failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-            print(f"OMNI-MATH download failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-            raise RuntimeError(f"OMNI-MATH dataset download failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-        logger.info("Hint helped dataset downloaded successfully")
-        print(f"Hint helped dataset downloaded successfully")
-        return result.stdout
-
-    # Execute downloads in parallel
-    #try:
-    #    hint_task = download_omni_math.remote()
-        # Wait for both to complete
-    #    hint_output = ray.get([hint_task])
-    #    logger.info("All datasets downloaded and preprocessed successfully")
-    #    logger.debug(f"Hint helped dataset output: {hint_output}")
-    #except Exception as e:
-    #    logger.error(f"Dataset download failed: {e}")
-    #    raise
+    """Load and preprocess the similar dataset using similardataset.py."""
+    logger.info("Starting similar dataset preprocessing...")
 
     @ray.remote
     def load_similar_dataset():
-        print(f"Downloading OMNI-MATH dataset...")
-        logger.info("Downloading OMNI-MATH dataset...")
+        print("Preprocessing similar dataset...")
+        logger.info("Preprocessing similar dataset...")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         result = subprocess.run(
-            [sys.executable, "-m", "verl_training.datasets.similardataset"],
+            [sys.executable, "-m", "verl_training.datasets.similardataset",
+             "--local_save_dir", PROCESSED_DATASET_SAVE_PATH],
             capture_output=True,
             text=True,
             cwd=script_dir,
         )
         if result.returncode != 0:
-            logger.error(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-            print(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-            raise RuntimeError(f"Similar dataset load failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
-        logger.info("Similar dataset loaded successfully")
-        print(f"Similar dataset loaded successfully")
+            logger.error(f"Similar dataset prep failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+            print(f"Similar dataset prep failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+            raise RuntimeError(f"Similar dataset prep failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}")
+        logger.info("Similar dataset preprocessed successfully")
+        print("Similar dataset preprocessed successfully")
         return result.stdout
 
-    # Execute downloads in parallel
     try:
-        similar_task = load_similar_dataset.remote()
-        # Wait for both to complete
-        similar_output = ray.get([similar_task])
-        logger.info("All datasets loaded successfully")
-        logger.debug(f"Similar dataset output: {similar_output}")
+        task = load_similar_dataset.remote()
+        output = ray.get([task])
+        logger.info("Dataset loaded successfully")
+        logger.debug(f"Similar dataset output: {output}")
     except Exception as e:
         logger.error(f"Dataset load failed: {e}")
         raise
 
 
 def run_training():
-    """Execute the veRL training pipeline."""
-    logger.info("Starting veRL training...")
+    """Execute the veRL training pipeline with HintDataset."""
+    logger.info("Starting veRL training with HintDataset...")
 
-    # Create checkpoint directory
     checkpoint_dir = os.path.join(
-        bolt.ARTIFACT_DIR_PARENT, "qwen3-4b-instruct-2507-jadid-checkpoint"
+        bolt.ARTIFACT_DIR_PARENT, "qwen3-4b-instruct-2507-hint-checkpoint"
     )
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Dataset paths
-    #home_dir = Path.home()
-    #gsm8k_train = home_dir / "data/gsm8k/train.parquet"
-    #gsm8k_test = home_dir / "data/gsm8k/test.parquet"
-    #math_train = home_dir / "data/math/train.parquet"
-    #math_test = home_dir / "data/math/test.parquet"
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_save_dir", default=PROCESSED_DATASET_SAVE_PATH)
     parser.add_argument("--total_epochs", default=TOTAL_EPOCHS)
@@ -225,14 +153,11 @@ def run_training():
     local_save_dir = args.local_save_dir
     total_epochs = args.total_epochs
 
-
-
-    #train_files = f"['{gsm8k_train}', '{math_train}']"
-    #est_files = f"['{gsm8k_test}', '{math_test}']"
     train_files = f"['{local_save_dir}/train.parquet']"
     test_files = f"['{local_save_dir}/test.parquet']"
-    # Training command with all hyperparameters
-    # This mirrors the original run_deepseek7b_llm_math.sh script in veRL
+
+    hint_dataset_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hint_dataset.py")
+
     training_args = [
         sys.executable,
         "-m",
@@ -247,11 +172,14 @@ def run_training():
         "data.max_response_length=24576",
         "data.filter_overlong_prompts=True",
         "data.truncation=error",
+        # Custom dataset class — HintDataset with on_batch_end hook
+        f"data.custom_cls.path={hint_dataset_path}",
+        "data.custom_cls.name=HintDataset",
         # Model and actor configuration
         "actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507",
         "actor_rollout_ref.actor.optim.lr=1e-6",
         "actor_rollout_ref.model.use_remove_padding=True",
-        "actor_rollout_ref.actor.ppo_mini_batch_size=512", #512
+        "actor_rollout_ref.actor.ppo_mini_batch_size=128",
         "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2",
         # KL divergence loss configuration
         "actor_rollout_ref.actor.use_kl_loss=True",
@@ -267,8 +195,8 @@ def run_training():
         "actor_rollout_ref.rollout.tensor_model_parallel_size=1",
         "actor_rollout_ref.rollout.name=vllm",
         "actor_rollout_ref.rollout.gpu_memory_utilization=0.6",
-        "actor_rollout_ref.rollout.max_num_batched_tokens=32768", #131072
-        "actor_rollout_ref.rollout.n=5",
+        "actor_rollout_ref.rollout.max_num_batched_tokens=32768",
+        "actor_rollout_ref.rollout.n=4",
         "actor_rollout_ref.rollout.val_kwargs.n=5",
         "actor_rollout_ref.rollout.val_kwargs.do_sample=true",
         "actor_rollout_ref.rollout.val_kwargs.temperature=1.0",
@@ -285,8 +213,8 @@ def run_training():
         # Trainer configuration
         "trainer.critic_warmup=0",
         'trainer.logger=["console", "wandb"]',
-        "trainer.project_name=verl_grpo_pope_dataset_guided_hinting",
-        "trainer.experiment_name=qwen3_4b_instruct_grpo_pope_dataset_guided_hinting",
+        "trainer.project_name=verl_grpo_hint_guided",
+        "trainer.experiment_name=qwen3_4b_instruct_grpo_hint_guided",
         f"trainer.default_local_dir={checkpoint_dir}",
         f"trainer.n_gpus_per_node={gpus_per_node}",
         f"trainer.nnodes={num_nodes}",
@@ -300,7 +228,6 @@ def run_training():
 
     logger.info(f"Training command: {' '.join(training_args)}")
 
-    # Run training (blocking call)
     try:
         result = subprocess.run(
             training_args,
@@ -324,21 +251,18 @@ def run_training():
 def main():
     """Main execution flow."""
     logger.info("=" * 80)
-    logger.info("veRL Training - bolt-ray Edition")
+    logger.info("veRL Training with HintDataset - bolt-ray Edition")
     logger.info("=" * 80)
 
-    # Initialize Ray connection
-    # In bolt-ray, Ray cluster is already running, so we just connect to it
     logger.info("Connecting to Ray cluster...")
     ray.init()
 
     logger.info(f"Ray cluster resources: {ray.cluster_resources()}")
     logger.info(f"Ray available resources: {ray.available_resources()}")
 
-    # Wait for GPU workers using placement groups
     wait_for_resources_with_placement_group()
 
-    # Step 1: Download datasets
+    # Step 1: Preprocess dataset
     download_datasets()
 
     # Step 2: Run training

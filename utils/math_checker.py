@@ -96,10 +96,89 @@ def normalize_text(s: str) -> str:
         return ""
     s = re.sub(r'\\text\{([^{}]*)\}', r'\1', s)
     s = re.sub(r'\\mathrm\{([^{}]*)\}', r'\1', s)
-    s = re.sub(r'\\[a-zA-Z]+', '', s)  # Remove LaTeX commands
+    s = re.sub(r'\\([a-zA-Z]+)', r'\1', s)  # Replace LaTeX commands with their name
     s = re.sub(r'[{}\[\]$]', '', s)     # Remove braces
     s = re.sub(r'\s+', ' ', s).strip().lower()
     return s
+
+
+def _strip_variable_assignment(s: str) -> str:
+    """Strip variable assignment prefixes like 'x = ', '\\lambda = ' from an expression."""
+    if not s:
+        return s
+    # Match patterns like: x = ..., \lambda = ..., f(x) = ...
+    stripped = re.sub(r'^\\?[A-Za-z][A-Za-z_{}()]*\s*=\s*', '', s)
+    return stripped
+
+
+def sympy_latex_equal(expr1: str, expr2: str, timeout_sec: float = 5.0) -> bool:
+    """Check if two LaTeX expressions are mathematically equal using sympy.
+
+    Conservative: only returns True when both expressions parse successfully
+    and simplify(expr1 - expr2) == 0. Returns False on any error or timeout.
+    """
+    if not expr1 or not expr2:
+        return False
+
+    # Skip text/word answers - sympy misparses \text{Yes} as algebraic product
+    if re.search(r'\\text\s*\{', expr1) or re.search(r'\\text\s*\{', expr2):
+        return False
+    if re.fullmatch(r'[A-Za-z]+', expr1.strip()) or re.fullmatch(r'[A-Za-z]+', expr2.strip()):
+        return False
+
+    # Strip variable assignment prefixes
+    e1 = _strip_variable_assignment(expr1.strip())
+    e2 = _strip_variable_assignment(expr2.strip())
+
+    # Normalize some LaTeX before parsing
+    for old, new in [('\\dfrac', '\\frac'), ('\\tfrac', '\\frac'),
+                     ('\\left', ''), ('\\right', ''),
+                     ('\\bigl', ''), ('\\bigr', ''),
+                     ('\\Bigl', ''), ('\\Bigr', '')]:
+        e1 = e1.replace(old, new)
+        e2 = e2.replace(old, new)
+
+    # Ensure \sqrt with no braces gets braces: \sqrt3 -> \sqrt{3}
+    e1 = re.sub(r'\\sqrt\s*([0-9a-zA-Z])(?![a-zA-Z0-9{])', r'\\sqrt{\1}', e1)
+    e2 = re.sub(r'\\sqrt\s*([0-9a-zA-Z])(?![a-zA-Z0-9{])', r'\\sqrt{\1}', e2)
+
+    import threading
+
+    result = [False]
+    error = [None]
+
+    def _worker():
+        try:
+            from sympy.parsing.latex import parse_latex
+            from sympy import simplify
+            sym1 = parse_latex(e1)
+            sym2 = parse_latex(e2)
+            # Both must be valid symbolic expressions (not None, not empty)
+            if sym1 is None or sym2 is None:
+                return
+            diff = simplify(sym1 - sym2)
+            if diff == 0:
+                result[0] = True
+        except Exception as exc:
+            error[0] = exc
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    t.join(timeout=timeout_sec)
+    if t.is_alive():
+        return False  # Timed out - conservative: return False
+    return result[0]
+
+
+def _has_standalone_vars(s: str) -> bool:
+    """Check if string has standalone variables (not inside text/mathrm commands)."""
+    if not s:
+        return False
+    s = re.sub(r'\\(text|mathrm|textbf|textit|mathbf|mathit|operatorname)\{[^{}]*\}', '', s)
+    s = re.sub(r'\\[a-zA-Z]+', '', s)
+    s = re.sub(r'[{}\[\]$^_,;:!?.]', '', s)
+    s = re.sub(r'[\s0-9+\-*/=()\\]', '', s)
+    return bool(re.search(r'[a-zA-Z]', s))
 
 
 def check_answer(generated: str, ground_truth: str) -> bool:
@@ -147,11 +226,24 @@ def check_answer(generated: str, ground_truth: str) -> bool:
         gt_parsed = parse(gt_normalized, extraction_config=config)
         gen_parsed = parse(gen_normalized, extraction_config=config)
         
+        # Guard: if original expressions contain variables but math_verify
+        # reduced them to plain numbers, the parse was likely wrong — invalidate.
+        if gt_parsed and gen_parsed:
+            import sympy as _sympy
+            _gt_num = isinstance(gt_parsed[0], (int, float, _sympy.Integer, _sympy.Float, _sympy.Rational))
+            _gen_num = isinstance(gen_parsed[0], (int, float, _sympy.Integer, _sympy.Float, _sympy.Rational))
+            _gt_vars = _has_standalone_vars(gt_normalized)
+            _gen_vars = _has_standalone_vars(gen_normalized)
+            if _gt_num and (_gt_vars or _gen_vars):
+                gt_parsed = []
+            if _gen_num and (_gt_vars or _gen_vars):
+                gen_parsed = []
+
         # If both parsed successfully, use math_verify
         if gt_parsed and gen_parsed:
             result = verify(gt_parsed[0], gen_parsed[0], strict=False)
             if result:
-                return True
+                    return True
             
             # Try sympy simplification for exponential equivalence (e.g., 4^{2006} = 2^{4012})
             try:
@@ -223,9 +315,11 @@ def check_answer(generated: str, ground_truth: str) -> bool:
     if gt_aggr and gen_aggr and gt_aggr == gen_aggr:
         return True
     
-    # DISABLED: latex2sympy2_extended fallback is too slow
-    # The math_verify library already handles most cases
-    
+    # Sympy LaTeX fallback: handles algebraic equivalences like
+    # \frac{1}{2}x vs \frac{x}{2}, (a+b)^2 vs a^2+2ab+b^2, etc.
+    if sympy_latex_equal(ground_truth, gen_ans):
+        return True
+
     # Final fallback: normalized string comparison
     return normalize_text(ground_truth) == normalize_text(gen_ans)
 
