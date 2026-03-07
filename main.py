@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 DATASET_NAME = "similar_dataset"
 PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
 TOTAL_EPOCHS = 600
-    
+import datetime
+EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
 import argparse
 import random
 from typing import Dict, Any
@@ -242,7 +244,7 @@ def run_training():
         # Data configuration
         f"data.train_files={train_files}",
         f"data.val_files={test_files}",
-        "data.train_batch_size=256",
+        "data.train_batch_size=1024",
         "data.max_prompt_length=4096",
         "data.max_response_length=24576",
         "data.filter_overlong_prompts=True",
@@ -286,7 +288,7 @@ def run_training():
         "trainer.critic_warmup=0",
         'trainer.logger=["console", "wandb"]',
         "trainer.project_name=verl_grpo_pope_dataset_guided_hinting",
-        "trainer.experiment_name=qwen3_4b_instruct_grpo_pope_dataset_guided_hinting",
+        "trainer.experiment_name={EXPERIMENT_NAME}",
         f"trainer.default_local_dir={checkpoint_dir}",
         f"trainer.n_gpus_per_node={gpus_per_node}",
         f"trainer.nnodes={num_nodes}",
