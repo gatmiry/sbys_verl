@@ -26,9 +26,10 @@ logger = logging.getLogger(__name__)
 DATASET_NAME = "similar_dataset"
 PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
 TOTAL_EPOCHS = 600
-import datetime
+from datetime import datetime
 SPECIAL_NAME = "batchsize_1024"
-EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}"
+import os
+EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}_{os.environ.get("BOLT_TASK_ID")}"
 
 import argparse
 import random
@@ -289,7 +290,7 @@ def run_training():
         "trainer.critic_warmup=0",
         'trainer.logger=["console", "wandb"]',
         "trainer.project_name=verl_grpo_pope_dataset_guided_hinting",
-        "trainer.experiment_name={EXPERIMENT_NAME}",
+        f"trainer.experiment_name={EXPERIMENT_NAME}",
         f"trainer.default_local_dir={checkpoint_dir}",
         f"trainer.n_gpus_per_node={gpus_per_node}",
         f"trainer.nnodes={num_nodes}",

@@ -30,9 +30,10 @@ logger = logging.getLogger(__name__)
 DATASET_NAME = "similar_dataset"
 PROCESSED_DATASET_SAVE_PATH = os.path.expanduser(f"~/data/{DATASET_NAME}")
 TOTAL_EPOCHS = 600
-import datetime
-SPECIAL_NAME = "batchsize_1024"
-EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}"
+from datetime import datetime
+import os
+SPECIAL_NAME = "batchsize512minibatch512ppoepochs2"
+EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}_{os.environ.get("BOLT_TASK_ID")}"
     
 import argparse
 import random
@@ -170,7 +171,7 @@ def run_training():
         # Data configuration
         f"data.train_files={train_files}",
         f"data.val_files={test_files}",
-        "data.train_batch_size=256",
+        "data.train_batch_size=512",
         "data.max_prompt_length=4096",
         "data.max_response_length=24576",
         "data.filter_overlong_prompts=True",
@@ -182,8 +183,9 @@ def run_training():
         "actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507",
         "actor_rollout_ref.actor.optim.lr=1e-6",
         "actor_rollout_ref.model.use_remove_padding=True",
-        "actor_rollout_ref.actor.ppo_mini_batch_size=128",
-        "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2",
+        "actor_rollout_ref.actor.ppo_mini_batch_size=512",
+        "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4", #2
+        "actor_rollout_ref.actor.ppo_epochs=2",
         # KL divergence loss configuration
         "actor_rollout_ref.actor.use_kl_loss=True",
         "actor_rollout_ref.actor.kl_loss_coef=0.001",
@@ -217,7 +219,7 @@ def run_training():
         "trainer.critic_warmup=0",
         'trainer.logger=["console", "wandb"]',
         "trainer.project_name=verl_grpo_hint_guided",
-        "trainer.experiment_name={EXPERIMENT_NAME}",
+        f"trainer.experiment_name={EXPERIMENT_NAME}",
         f"trainer.default_local_dir={checkpoint_dir}",
         f"trainer.n_gpus_per_node={gpus_per_node}",
         f"trainer.nnodes={num_nodes}",
