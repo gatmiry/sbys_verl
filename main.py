@@ -29,7 +29,7 @@ TOTAL_EPOCHS = 600
 from datetime import datetime
 SPECIAL_NAME = "batchsize_1024"
 import os
-EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}_{os.environ.get("BOLT_TASK_ID")}"
+EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}_{os.environ.get('BOLT_TASK_ID')}"
 
 import argparse
 import random

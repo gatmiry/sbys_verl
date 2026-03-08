@@ -33,7 +33,7 @@ TOTAL_EPOCHS = 600
 from datetime import datetime
 import os
 SPECIAL_NAME = "batchsize512minibatch512ppoepochs2"
-EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}_{os.environ.get("BOLT_TASK_ID")}"
+EXPERIMENT_NAME = f"multinode_{DATASET_NAME}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{SPECIAL_NAME}_{os.environ.get('BOLT_TASK_ID')}"
     
 import argparse
 import random
@@ -171,7 +171,7 @@ def run_training():
         # Data configuration
         f"data.train_files={train_files}",
         f"data.val_files={test_files}",
-        "data.train_batch_size=512",
+        "data.train_batch_size=2048",
         "data.max_prompt_length=4096",
         "data.max_response_length=24576",
         "data.filter_overlong_prompts=True",
@@ -183,7 +183,7 @@ def run_training():
         "actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507",
         "actor_rollout_ref.actor.optim.lr=1e-6",
         "actor_rollout_ref.model.use_remove_padding=True",
-        "actor_rollout_ref.actor.ppo_mini_batch_size=512",
+        "actor_rollout_ref.actor.ppo_mini_batch_size=1024",
         "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4", #2
         "actor_rollout_ref.actor.ppo_epochs=2",
         # KL divergence loss configuration
